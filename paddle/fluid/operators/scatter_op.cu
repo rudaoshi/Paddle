@@ -33,7 +33,12 @@ class ScatterOpCUDAKernel : public framework::OpKernel<T> {
     bool overwrite = ctx.Attr<bool>("overwrite");
 
     Out->ShareDataWith(*X);
-    GPUScatterAssign<T>(ctx, *Updates, *Ids, Out, overwrite);
+    const auto &index_type = Ids->type();
+    
+    if (index_type == framework::proto::VarType::INT32)
+        GPUScatterAssign<T, int>(ctx, *Updates, *Ids, Out, overwrite);
+    else if (index_type == framework::proto::VarType::INT64)
+        GPUScatterAssign<T, int64_t>(ctx, *Updates, *Ids, Out, overwrite);
   }
 };
 
@@ -54,7 +59,11 @@ class ScatterGradOpCUDAKernel : public framework::OpKernel<T> {
     if (dUpdates) {
       dUpdates->mutable_data<T>(ctx.GetPlace());
       // Gradient by Gather: dUpdates = dO[Ids]
-      GPUGather<T>(ctx.device_context(), *dOut, *Ids, dUpdates);
+      const auto &index_type = Ids->type();
+      if (index_type == framework::proto::VarType::INT32)
+        GPUGather<T, int>(ctx.device_context(), *dOut, *Ids, dUpdates);
+      else if (index_type == framework::proto::VarType::INT64)
+        GPUGather<T, int64_t>(ctx.device_context(), *dOut, *Ids, dUpdates);
     }
   }
 };
